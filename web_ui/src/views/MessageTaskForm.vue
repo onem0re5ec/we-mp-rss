@@ -4,6 +4,7 @@ const formRef = ref()
 import { useRoute, useRouter } from 'vue-router'
 import { getMessageTask, createMessageTask, updateMessageTask } from '@/api/messageTask'
 import type { MessageTask, MessageTaskCreate } from '@/types/messageTask'
+import type { MpItem } from '@/types/subscription'
 import cronExpressionPicker from '@/components/cronExpressionPicker.vue'
 import MpMultiSelect from '@/components/MpMultiSelect.vue'
 import { Message } from '@arco-design/web-vue'
@@ -23,7 +24,7 @@ const formData = ref<MessageTaskCreate>({
   message_type: 0,
   message_template: '',
   web_hook_url: '',
-  mps_id: [],
+  mps_id: [] as MpItem[],
   status: 1,
   cron_exp: '*/5 * * * *'
 })
@@ -37,7 +38,7 @@ const fetchTaskDetail = async (id: string) => {
       message_type: res.message_type,
       message_template: res.message_template,
       web_hook_url: res.web_hook_url,
-      mps_id: JSON.parse(res.mps_id||[]),
+      mps_id: res.mps_id ? JSON.parse(res.mps_id) : [],
       status: res.status,
       cron_exp: res.cron_exp
     }
@@ -46,7 +47,7 @@ const fetchTaskDetail = async (id: string) => {
       if (cronPickerRef.value) {
         cronPickerRef.value.parseExpression(formData.value.cron_exp)
       }
-      if (mpSelectorRef.value) {
+      if (mpSelectorRef.value && formData.value.mps_id.length > 0) {
         mpSelectorRef.value.parseSelected(formData.value.mps_id)
       }
     })
