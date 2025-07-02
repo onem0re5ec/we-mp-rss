@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { searchMps } from '@/api/subscription'
+import type { MpItem } from '@/types/subscription'
 
 const formatCoverUrl = (url: string) => {
   if (!url) return ''
@@ -10,16 +11,10 @@ const formatCoverUrl = (url: string) => {
   return url
 }
 
-interface MpItem {
-  id: string
-  mp_name: string
-  mp_cover: string
-}
-
 const props = defineProps({
   modelValue: {
-    type: String,
-    default: () => ""
+    type: Array as () => MpItem[],
+    default: () => []
   }
 })
 
@@ -29,6 +24,9 @@ const searchKeyword = ref('')
 const loading = ref(false)
 const mpList = ref<MpItem[]>([])
 const selectedMps = ref<MpItem[]>([])
+const currentPage = ref(0)
+const hasMore = ref(true)
+const pageSize = 10
 
 const filteredMps = computed(() => {
   return mpList.value.filter(mp => 
@@ -36,18 +34,52 @@ const filteredMps = computed(() => {
   )
 })
 
-const fetchMps = async () => {
+const fetchMps = async (reset = true) => {
   loading.value = true
   try {
-    const res = await searchMps(searchKeyword.value)
-    mpList.value = res.list
+    if (reset) {
+      currentPage.value = 0
+      mpList.value = []
+    }
+    
+    const res = await searchMps(searchKeyword.value, { 
+      page: currentPage.value,
+      pageSize: pageSize
+    })
+    
+    // 将 API 返回的数据格式转换为组件内部使用的格式
+    const mappedList = res.list.map((item: any) => ({
+      id: item.mp_id || item.id,
+      mp_name: item.mp_name,
+      mp_cover: item.avatar || item.mp_cover
+    }))
+    
+    // 添加新加载的数据到列表，避免覆盖已有数据
+    if (reset) {
+      mpList.value = mappedList
+    } else {
+      // 合并数据，避免重复
+      const newMps = mappedList.filter(newMp => 
+        !mpList.value.some(existingMp => existingMp.id === newMp.id)
+      )
+      mpList.value = [...mpList.value, ...newMps]
+    }
+    
+    // 判断是否还有更多数据
+    hasMore.value = res.list.length === pageSize
+    
   } finally {
     loading.value = false
   }
 }
 
+const loadMore = async () => {
+  currentPage.value++
+  await fetchMps(false)
+}
+
 const handleSearch = () => {
-  fetchMps()
+  fetchMps(true)
 }
 
 const toggleSelect = (mp: MpItem) => {
@@ -80,9 +112,9 @@ const selectAll = () => {
 }
 
 const emitSelectedIds = () => {
-  // emit('update:modelValue', selectedMps.value.map(mp => mp.id).join(','))
   emit('update:modelValue', selectedMps.value)
 }
+
 const parseSelected = (data:MpItem[]) => {
   selectedMps.value = data.map(item => {
     const found = mpList.value.find(mp => mp.id === item.id)
@@ -100,7 +132,7 @@ defineExpose({
 
 onMounted(() => {
   fetchMps()
-  if (props.modelValue.length > 0) {
+  if (props.modelValue && props.modelValue.length > 0) {
     parseSelected(props.modelValue)
   }
 })
@@ -159,6 +191,12 @@ onMounted(() => {
             </a-space>
           </div>
         </div>
+        
+        <div v-if="hasMore" class="load-more">
+          <a-button type="text" @click="loadMore" :loading="loading">
+            加载更多
+          </a-button>
+        </div>
       </a-spin>
     </a-space>
   </a-card>
@@ -199,5 +237,11 @@ h4 {
 
 .mp-item:hover {
   background-color: var(--color-fill-2);
+}
+
+.load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
 }
 </style>

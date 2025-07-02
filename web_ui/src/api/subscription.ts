@@ -32,6 +32,8 @@ export interface MpItem {
   mp_id: string
   mp_name: string
   avatar: string
+  id?: string
+  mp_cover?: string
 }
 
 export interface MpSearchResult {
